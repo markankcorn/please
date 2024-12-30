@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 
 	"github.com/eiannone/keyboard"
@@ -75,7 +76,7 @@ func getGeminiResponse(ctx context.Context, client *genai.Client, history []stri
 	// Build the prompt with history and user request
 	var fullPrompt strings.Builder
 	fullPrompt.WriteString(fmt.Sprintf("You are an expert at bash command line for %s. ", osName))
-	fullPromp.WriteString("Here is my zsh command history for context:\n")
+	fullPrompt.WriteString("Here is my zsh command history for context:\n")
 	for _, h := range history {
 		fullPrompt.WriteString(h)
 		fullPrompt.WriteString("\n")
