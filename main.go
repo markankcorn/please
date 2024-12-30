@@ -30,11 +30,16 @@ func getOS() string {
 	}
 }
 
-// Function to read Zsh history
+// Function to read Zsh history (updated to handle both Linux and macOS)
 func readZshHistory(n int) ([]string, error) {
 	historyFile := os.Getenv("HISTFILE")
 	if historyFile == "" {
-		historyFile = os.Getenv("HOME") + "/.zsh_history"
+		// Default Zsh history file locations
+		if runtime.GOOS == "darwin" {
+			historyFile = os.Getenv("HOME") + "/.zsh_history"
+		} else { // Assume Linux for other OSes
+			historyFile = os.Getenv("HOME") + "/.zsh_history"
+		}
 	}
 
 	file, err := os.Open(historyFile)
@@ -62,8 +67,8 @@ func readZshHistory(n int) ([]string, error) {
 		}
 	}
 
-	// Get the last 10 commands
-	startIndex := len(commands) - 10
+	// Get the last n commands
+	startIndex := len(commands) - n
 	if startIndex < 0 {
 		startIndex = 0
 	}
@@ -71,9 +76,9 @@ func readZshHistory(n int) ([]string, error) {
 	return commands[startIndex:], nil
 }
 
-// Function to create the prompt, send to Gemini, and get the response
+// Updated getGeminiResponse function with OS information
 func getGeminiResponse(ctx context.Context, client *genai.Client, osName string, history []string, prompt string) ([]string, error) {
-	// Build the prompt with history and user request
+	// Build the prompt with OS, history, and user request
 	var fullPrompt strings.Builder
 	fullPrompt.WriteString(fmt.Sprintf("You are an expert at bash command line for %s. ", osName))
 	fullPrompt.WriteString("Here is my zsh command history for context:\n")
@@ -81,7 +86,7 @@ func getGeminiResponse(ctx context.Context, client *genai.Client, osName string,
 		fullPrompt.WriteString(h)
 		fullPrompt.WriteString("\n")
 	}
-	fullPrompt.WriteString("Based on this history and the following request, generate ONLY three bash commands in your response, each on a new line and in order of best to worst, and nothing else, no other text, that accomplish what is described: ")
+	fullPrompt.WriteString("Based on this history and the following request, generate ONLY three bash commands in your response, each on a new line, and nothing else, no other text, that accomplish what is described: ")
 	fullPrompt.WriteString(prompt)
 
 	model := client.GenerativeModel("gemini-pro")
@@ -108,7 +113,6 @@ func getGeminiResponse(ctx context.Context, client *genai.Client, osName string,
 	return commands, nil
 }
 
-// Function to execute the command
 func executeCommand(command string) error {
 	cmd := exec.Command("bash", "-c", command)
 	cmd.Stdout = os.Stdout
@@ -116,7 +120,37 @@ func executeCommand(command string) error {
 	return cmd.Run()
 }
 
-// Here's main
+func printSuggestions(suggestions []string, selectedIndex int) {
+	for i, suggestion := range suggestions {
+		if i == selectedIndex {
+			fmt.Printf("-> %s\n", suggestion)
+		} else {
+			fmt.Printf("   %s\n", suggestion)
+		}
+	}
+}
+
+func handleKeyPress(suggestions []string, selectedIndex int) (int, bool) {
+	_, key, err := keyboard.GetKey()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	switch key {
+	case keyboard.KeyTab:
+		return (selectedIndex + 1) % len(suggestions), false
+	case keyboard.KeyEnter:
+		executeCommand(suggestions[selectedIndex])
+		return selectedIndex, true
+	case keyboard.KeyEsc:
+		fmt.Println("\nSuggestions rejected.")
+		return selectedIndex, true
+	default:
+		fmt.Println("\nExiting.")
+		return selectedIndex, true
+	}
+}
+
 func main() {
 	apiKey := os.Getenv("GOOGLE_API_KEY")
 	if apiKey == "" {
@@ -141,10 +175,10 @@ func main() {
 	if err != nil {
 		log.Fatal("Error reading Zsh history:", err)
 	}
-	
+
 	osName := getOS()
-	
-	suggestions, err := getGeminiResponse(ctx, client, history, userRequest)
+
+	suggestions, err := getGeminiResponse(ctx, client, osName, history, userRequest)
 	if err != nil {
 		log.Fatal("Error getting response from Gemini:", err)
 	}
@@ -154,64 +188,23 @@ func main() {
 		return
 	}
 
-	// Open keyboard in raw mode
 	if err := keyboard.Open(); err != nil {
 		log.Fatal(err)
 	}
 	defer keyboard.Close()
 
-	// Print initial suggestions
 	fmt.Println("Suggestions (use Tab to cycle, Enter to accept, Esc to reject):")
-	for i, suggestion := range suggestions {
-		if i == 0 {
-			fmt.Printf("-> %s\n", suggestion) // Highlight the first suggestion
-		} else {
-			fmt.Printf("   %s\n", suggestion)
-		}
-	}
+	printSuggestions(suggestions, 0)
 
 	selectedIndex := 0
 	for {
-		char, key, err := keyboard.GetKey()
-		if err != nil {
-			log.Fatal(err)
+		selectedIndex, shouldExit := handleKeyPress(suggestions, selectedIndex)
+		if shouldExit {
+			break
 		}
 
-		// Handle key presses
-		switch key {
-		case keyboard.KeyTab:
-			// Cycle to the next suggestion
-			selectedIndex = (selectedIndex + 1) % len(suggestions)
-		case keyboard.KeyEnter:
-			// Execute the selected command
-			executeCommand(suggestions[selectedIndex])
-			return
-		case keyboard.KeyEsc:
-			// Reject all suggestions and exit
-			fmt.Println("\nSuggestions rejected.")
-			return
-		default:
-			// Handle other keys if needed (e.g., for editing a suggestion)
-			if char != 0 {
-				// In this basic example, any other key press will exit
-				fmt.Println("\nExiting.")
-				return
-			}
-		}
-
-		// Clear the previous suggestions
-		for range suggestions {
-			fmt.Print("\033[A\033[2K") // ANSI escape codes to move up and clear the line
-		}
-
-		// Reprint suggestions with the current selection highlighted
+		fmt.Print("\033[H\033[2J") // Clear the screen
 		fmt.Println("Suggestions (use Tab to cycle, Enter to accept, Esc to reject):")
-		for i, suggestion := range suggestions {
-			if i == selectedIndex {
-				fmt.Printf("-> %s\n", suggestion)
-			} else {
-				fmt.Printf("   %s\n", suggestion)
-			}
-		}
+		printSuggestions(suggestions, selectedIndex)
 	}
 }
