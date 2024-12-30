@@ -76,7 +76,7 @@ func readZshHistory(n int) ([]string, error) {
 	return commands[startIndex:], nil
 }
 
-// Updated getGeminiResponse function with OS information
+// build the prompt and send it to Gemini
 func getGeminiResponse(ctx context.Context, client *genai.Client, osName string, history []string, prompt string) ([]string, error) {
 	// Build the prompt with OS, history, and user request
 	var fullPrompt strings.Builder
@@ -113,6 +113,7 @@ func getGeminiResponse(ctx context.Context, client *genai.Client, osName string,
 	return commands, nil
 }
 
+// execute the command
 func executeCommand(command string) error {
 	cmd := exec.Command("bash", "-c", command)
 	cmd.Stdout = os.Stdout
@@ -120,6 +121,7 @@ func executeCommand(command string) error {
 	return cmd.Run()
 }
 
+// show some suggestions
 func printSuggestions(suggestions []string, selectedIndex int) {
 	for i, suggestion := range suggestions {
 		if i == selectedIndex {
@@ -130,6 +132,7 @@ func printSuggestions(suggestions []string, selectedIndex int) {
 	}
 }
 
+// 
 func handleKeyPress(suggestions []string, selectedIndex int) (int, bool) {
 	_, key, err := keyboard.GetKey()
 	if err != nil {
