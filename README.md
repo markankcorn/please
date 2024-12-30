@@ -39,3 +39,5 @@ Now for our first dependency, the Google AI Go SDK. T his will add the necessary
 `go get github.com/google/generative-ai-go`
 
 To handle the Tab / Enter / Escape functionality, we'll need a third-party library to help us 
+
+We'll also need to get an API key from Google. Go (here)[https://aistudio.google.com/app/apikey] and fetch one and be sure to edit your `go.main` file to include this. You can also change the history look-back to be any number of commands in the `/zsh_history` using the `n` variable in line 
