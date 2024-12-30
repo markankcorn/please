@@ -72,7 +72,7 @@ func readZshHistory(n int) ([]string, error) {
 }
 
 // Function to create the prompt, send to Gemini, and get the response
-func getGeminiResponse(ctx context.Context, client *genai.Client, history []string, prompt string) ([]string, error) {
+func getGeminiResponse(ctx context.Context, client *genai.Client, osName string, history []string, prompt string) ([]string, error) {
 	// Build the prompt with history and user request
 	var fullPrompt strings.Builder
 	fullPrompt.WriteString(fmt.Sprintf("You are an expert at bash command line for %s. ", osName))
