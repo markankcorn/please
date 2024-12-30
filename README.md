@@ -1,7 +1,9 @@
 # please
 command line tool written in Go to use Gemini for help with command syntax
 
-Based on the [please.bash](https://github.com/pmarreck/dotfiles/blob/master/bin/functions/please.bash) project from [Peter Marreck](https://github.com/pmarreck) I asked Gemini to write a Go executable program to get assistance on commands for Zshell. It reads the previous ten commands from the `.zsh_history` file but we can modify the program later using the `HISTFILE` environment variable. This is my attempt to replace some of the functionality of the [Warp](warp.dev) terminal emulator, which does a very fine job of getting me out of syntax frustration, but it's a massive memory hog. It's also not yet (Dec 2024) available on Windows and I very much enjoy using my GPUs on my gaming pc for running local models. I'd like to be able to use this both on my MacBook and on my Win11 rig running Ubuntu via WSL.
+Based on the [please.bash](https://github.com/pmarreck/dotfiles/blob/master/bin/functions/please.bash) project from [Peter Marreck](https://github.com/pmarreck) I asked Gemini to write a Go executable program to get assistance on commands for Zshell. It reads the previous ten commands from the `.zsh_history` file but we can modify the program later using the `HISTFILE` environment variable. 
+
+This is my attempt to replace some of the functionality of the [Warp](warp.dev) terminal emulator, which does a very fine job of getting me out of syntax frustration, but it's a massive memory hog. It's also not yet (Dec 2024) available on Windows and I very much enjoy using my GPUs on my gaming pc for running local models. I'd like to be able to use this both on my MacBook and on my Win11 rig running Ubuntu via WSL.
 
 The tool will ask Gemini to present three suggestions for commands to the user, who can use the Tab key to cycle through the suggestions, Enter to accept and run a suggestion, or Escape key to reject all and return to the command line.
 
