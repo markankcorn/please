@@ -14,8 +14,100 @@ import (
 	"google.golang.org/api/option"
 )
 
-// ... (readZshHistory, getGeminiResponse functions from above)
+// Function to get the operating system
+func getOS() string {
+	osName := runtime.GOOS
+	switch osName {
+	case "windows":
+		return "Windows (WSL/Ubuntu)" // Assume WSL if on Windows
+	case "darwin":
+		return "macOS"
+	case "linux":
+		return "Linux"
+	default:
+		return "Unknown"
+	}
+}
 
+// Function to read Zsh history
+func readZshHistory(n int) ([]string, error) {
+	historyFile := os.Getenv("HISTFILE")
+	if historyFile == "" {
+		historyFile = os.Getenv("HOME") + "/.zsh_history"
+	}
+
+	file, err := os.Open(historyFile)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var lines []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	// Extract only the command portion from the history lines
+	var commands []string
+	for _, line := range lines {
+		parts := strings.SplitN(line, ";", 2)
+		if len(parts) == 2 {
+			commands = append(commands, parts[1])
+		}
+	}
+
+	// Get the last 10 commands
+	startIndex := len(commands) - 10
+	if startIndex < 0 {
+		startIndex = 0
+	}
+
+	return commands[startIndex:], nil
+}
+
+// Function to create the prompt, send to Gemini, and get the response
+func getGeminiResponse(ctx context.Context, client *genai.Client, history []string, prompt string) ([]string, error) {
+	// Build the prompt with history and user request
+	var fullPrompt strings.Builder
+	fullPrompt.WriteString(fmt.Sprintf("You are an expert at bash command line for %s. ", osName))
+	fullPromp.WriteString("Here is my zsh command history for context:\n")
+	for _, h := range history {
+		fullPrompt.WriteString(h)
+		fullPrompt.WriteString("\n")
+	}
+	fullPrompt.WriteString("Based on this history and the following request, generate ONLY three bash commands in your response, each on a new line and in order of best to worst, and nothing else, no other text, that accomplish what is described: ")
+	fullPrompt.WriteString(prompt)
+
+	model := client.GenerativeModel("gemini-pro")
+	resp, err := model.GenerateContent(ctx, genai.Text(fullPrompt.String()))
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse the response to extract the three commands
+	var commands []string
+	if len(resp.Candidates) > 0 && len(resp.Candidates[0].Content.Parts) > 0 {
+		responseContent := fmt.Sprintf("%s", resp.Candidates[0].Content.Parts[0])
+		lines := strings.Split(responseContent, "\n")
+		for _, line := range lines {
+			trimmedLine := strings.TrimSpace(line)
+			if trimmedLine != "" {
+				commands = append(commands, trimmedLine)
+			}
+		}
+	} else {
+		return nil, fmt.Errorf("empty response from Gemini API")
+	}
+
+	return commands, nil
+}
+
+// Function to execute the command
 func executeCommand(command string) error {
 	cmd := exec.Command("bash", "-c", command)
 	cmd.Stdout = os.Stdout
@@ -23,6 +115,7 @@ func executeCommand(command string) error {
 	return cmd.Run()
 }
 
+// Here's main
 func main() {
 	apiKey := os.Getenv("GOOGLE_API_KEY")
 	if apiKey == "" {
@@ -47,7 +140,9 @@ func main() {
 	if err != nil {
 		log.Fatal("Error reading Zsh history:", err)
 	}
-
+	
+	osName := getOS()
+	
 	suggestions, err := getGeminiResponse(ctx, client, history, userRequest)
 	if err != nil {
 		log.Fatal("Error getting response from Gemini:", err)
